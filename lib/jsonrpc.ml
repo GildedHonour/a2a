@@ -1,49 +1,6 @@
-type send_message_params = {
-  message : Types.message;
-  configuration : Yojson.Safe.t option;
-  metadata : Types.metadata option;
-}
-
-type request = {
-  jsonrpc : string;
-  id : id;
-  method_ : method_;
-  params : Yojson.Safe.t option;
-}
-
-val method_to_string : method_ -> string
-val request : ?params:Yojson.Safe.t -> id -> method_ -> request
-val send_message_request : id -> send_message_params -> request
-val request_to_json : request -> Yojson.Safe.t
-val response_to_json : response -> Yojson.Safe.t
-
-let send_message_params_to_json params =
-  let fields = [ ("message", Json.message_to_json params.message) ] in
-  let fields =
-    match params.configuration with
-    | Some value ->
-        ("configuration", value) :: fields
-    | None ->
-        fields
-  in
-  let fields =
-    match params.metadata with
-    | Some value ->
-        ("metadata", Json.metadata_to_json value) :: fields
-    | None ->
-        fields
-  in
-  `Assoc (List.rev fields)
-
 type id =
   | StringId of string
   | IntId of int
-
-let id_to_json = function
-  | StringId value ->
-      `String value
-  | IntId value ->
-      `Int value
 
 type method_ =
   | SendMessage
@@ -57,6 +14,60 @@ type method_ =
   | ListTaskPushNotificationConfigs
   | DeleteTaskPushNotificationConfig
   | GetExtendedAgentCard
+
+type request = {
+  jsonrpc : string;
+  id : id;
+  method_ : method_;
+  params : Yojson.Safe.t option;
+}
+
+let send_request ?params id method_ = { jsonrpc = "2.0"; id; method_; params }
+
+type rpc_error = {
+  code : int;
+  message : string;
+  data : Yojson.Safe.t option;
+}
+
+let error_to_json (e : rpc_error) =
+  let fields = [ ("code", `Int e.code); ("message", `String e.message) ] in
+  let fields =
+    match e.data with
+    | Some data ->
+        ("data", data) :: fields
+    | None ->
+        fields
+  in
+  `Assoc (List.rev fields)
+
+(* TODO
+
+let send_message_params_to_json params =
+    let fields = [ ("message", Json.message_to_json params.message) ] in
+    let fields =
+    match params.configuration with
+    | Some value ->
+        ("configuration", value) :: fields
+    | None ->
+        fields
+    in
+    let fields =
+    match params.metadata with
+    | Some value ->
+        ("metadata", Json.metadata_to_json value) :: fields
+    | None ->
+        fields
+    in
+    `Assoc (List.rev fields)
+
+*)
+
+let id_to_json = function
+  | StringId value ->
+      `String value
+  | IntId value ->
+      `Int value
 
 let method_to_string = function
   | SendMessage ->
@@ -82,12 +93,6 @@ let method_to_string = function
   | GetExtendedAgentCard ->
       "GetExtendedAgentCard"
 
-type error = {
-  code : int;
-  message : string;
-  data : Yojson.Safe.t option;
-}
-
 type response =
   | Result of {
       jsonrpc : string;
@@ -97,5 +102,41 @@ type response =
   | Error of {
       jsonrpc : string;
       id : id option;
-      error : error;
+      error : rpc_error;
     }
+
+let request_to_json request =
+  let fields =
+    [
+      ("jsonrpc", `String request.jsonrpc);
+      ("id", id_to_json request.id);
+      ("method", `String (method_to_string request.method_));
+    ]
+  in
+  let fields =
+    match request.params with
+    | Some params ->
+        ("params", params) :: fields
+    | None ->
+        fields
+  in
+  `Assoc (List.rev fields)
+
+let response_to_json = function
+  | Result { jsonrpc; id; result } ->
+      `Assoc
+        [
+          ("jsonrpc", `String jsonrpc); ("id", id_to_json id); ("result", result);
+        ]
+  | Error { jsonrpc; id; error } ->
+      let fields =
+        [ ("jsonrpc", `String jsonrpc); ("error", error_to_json error) ]
+      in
+      let fields =
+        match id with
+        | Some id ->
+            ("id", id_to_json id) :: fields
+        | None ->
+            fields
+      in
+      `Assoc (List.rev fields)

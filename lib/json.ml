@@ -1,8 +1,8 @@
 open Types
 
-exception Decode_error of string
+exception DecodeError of string
 
-let error message = raise (Decode_error message)
+(* let error message = raise (DecodeError message) *)
 
 let field name json =
   match Yojson.Safe.Util.member name json with
@@ -16,14 +16,14 @@ let required_field name json =
   | Some value ->
       value
   | None ->
-      error ("missing field: " ^ name)
+      raise (DecodeError ("missing field: " ^ name))
 
 let string_field name json =
   match required_field name json with
   | `String value ->
       value
   | _ ->
-      error ("field is not a string: " ^ name)
+      raise (DecodeError ("field is not a string: " ^ name))
 
 let optional_string_field name json =
   match field name json with
@@ -32,7 +32,7 @@ let optional_string_field name json =
   | Some (`String value) ->
       Some value
   | Some _ ->
-      error ("field is not a string: " ^ name)
+      raise (DecodeError ("field is not a string: " ^ name))
 
 let metadata_to_json metadata = `Assoc metadata
 
@@ -40,7 +40,7 @@ let metadata_of_json = function
   | `Assoc fields ->
       fields
   | _ ->
-      error "metadata is not an object"
+      raise (DecodeError "metadata is not an object")
 
 let part_to_json part =
   let fields =
@@ -89,13 +89,13 @@ let part_of_json json =
         | Ok decoded ->
             Raw (Bytes.of_string decoded)
         | Error (`Msg message) ->
-            error ("invalid base64: " ^ message))
+            raise (DecodeError ("invalid base64: " ^ message)))
     | None, None, Some (`String url), None ->
         Url url
     | None, None, None, Some data ->
         Data data
     | _ ->
-        error "Part must contain exactly one content field"
+        raise (DecodeError "Part must contain exactly one content field")
   in
   let metadata =
     match field "metadata" json with
@@ -128,10 +128,10 @@ let string_list_of_json = function
           | `String value ->
               value
           | _ ->
-              error "expected string in string list")
+              raise (DecodeError "expected string in string list"))
         values
   | _ ->
-      error "expected string list"
+      raise (DecodeError "expected string list")
 
 let task_state_to_json = function
   | Unspecified ->
@@ -173,4 +173,60 @@ let task_state_of_json = function
   | `String "TASK_STATE_AUTH_REQUIRED" ->
       AuthRequired
   | _ ->
-      raise (Error "invalid task state")
+      raise (DecodeError "invalid task state")
+
+let message_to_json message =
+  let fields =
+    [
+      ("messageId", `String message.message_id);
+      ( "role",
+        `String
+          (match message.role with
+          | Unspecified ->
+              "ROLE_UNSPECIFIED"
+          | User ->
+              "ROLE_USER"
+          | Agent ->
+              "ROLE_AGENT") );
+      ("parts", `List (List.map part_to_json message.parts));
+    ]
+  in
+  let fields =
+    match message.context_id with
+    | Some value ->
+        ("contextId", `String value) :: fields
+    | None ->
+        fields
+  in
+  let fields =
+    match message.task_id with
+    | Some value ->
+        ("taskId", `String value) :: fields
+    | None ->
+        fields
+  in
+  let fields =
+    match message.metadata with
+    | Some value ->
+        ("metadata", metadata_to_json value) :: fields
+    | None ->
+        fields
+  in
+  let fields =
+    match message.extensions with
+    | [] ->
+        fields
+    | values ->
+        ("extensions", `List (List.map (fun value -> `String value) values))
+        :: fields
+  in
+  let fields =
+    match message.reference_task_ids with
+    | [] ->
+        fields
+    | values ->
+        ( "referenceTaskIds",
+          `List (List.map (fun value -> `String value) values) )
+        :: fields
+  in
+  `Assoc (List.rev fields)

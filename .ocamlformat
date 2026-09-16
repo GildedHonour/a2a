@@ -7,3 +7,4 @@ let-and = sparse
 single-case = sparse
 field-space=loose
 doc-comments=before
+margin = 80
