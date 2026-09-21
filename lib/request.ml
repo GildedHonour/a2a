@@ -1,11 +1,12 @@
-open Types
-
 type send_message_request = {
   tenant : string option;
-  message : message;
-  configuration : send_message_configuration option;
-  metadata : metadata option;
+  message : Types.message;
+  configuration : Types.send_message_configuration option;
+  metadata : Types.metadata option;
 }
+
+let build_send_message_request ?tenant ?configuration ?metadata message =
+  { tenant; message; configuration; metadata }
 
 type send_message_params = {
   message : Types.message;
@@ -22,7 +23,7 @@ type get_task_request = {
 type list_tasks_request = {
   tenant : string option;
   context_id : string option;
-  status : task_state option;
+  status : Types.task_state option;
   page_size : int option;
   page_token : string option;
   history_length : int option;
@@ -33,7 +34,7 @@ type list_tasks_request = {
 type cancel_task_request = {
   tenant : string option;
   id : string;
-  metadata : metadata option;
+  metadata : Types.metadata option;
 }
 
 type subscribe_to_task_request = {
@@ -42,7 +43,7 @@ type subscribe_to_task_request = {
 }
 
 type create_task_push_notification_config_request =
-  task_push_notification_config
+  Types.task_push_notification_config
 
 type get_task_push_notification_config_request = {
   tenant : string option;
@@ -69,9 +70,6 @@ type list_tasks_response = Types.list_tasks_response
 
 type list_task_push_notification_configs_response =
   Types.list_task_push_notification_configs_response
-
-let send_message_request ?tenant ?configuration ?metadata message =
-  { tenant; message; configuration; metadata }
 
 let get_task_request ?tenant ?history_length id = { tenant; id; history_length }
 

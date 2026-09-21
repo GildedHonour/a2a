@@ -1,4 +1,4 @@
 (library
  (public_name a2a)
  (name a2a)
- (libraries yojson ptime base64))
+ (libraries yojson ptime base64 cohttp-lwt-unix))

@@ -175,7 +175,57 @@ let task_state_of_json = function
   | _ ->
       raise (DecodeError "invalid task state")
 
-let message_to_json message =
+let task_push_notification_config_to_json
+    (config : Types.task_push_notification_config) =
+  let fields0 = [ ("url", `String config.url) ] in
+  let fields1 =
+    match config.tenant with
+    | Some value ->
+        ("tenant", `String value) :: fields0
+    | None ->
+        fields0
+  in
+  let fields2 =
+    match config.id with
+    | Some value ->
+        ("id", `String value) :: fields1
+    | None ->
+        fields1
+  in
+  let fields3 =
+    match config.task_id with
+    | Some value ->
+        ("taskId", `String value) :: fields2
+    | None ->
+        fields2
+  in
+  let fields4 =
+    match config.token with
+    | Some value ->
+        ("token", `String value) :: fields3
+    | None ->
+        fields3
+  in
+  let fields5 =
+    match config.authentication with
+    | Some value ->
+        ( "authentication",
+          `Assoc
+            (match value.credentials with
+            | Some credentials ->
+                [
+                  ("scheme", `String value.scheme);
+                  ("credentials", `String credentials);
+                ]
+            | None ->
+                [ ("scheme", `String value.scheme) ]) )
+        :: fields4
+    | None ->
+        fields4
+  in
+  `Assoc (List.rev fields5)
+
+let message_to_json (message : Types.message) =
   let fields =
     [
       ("messageId", `String message.message_id);
@@ -230,3 +280,33 @@ let message_to_json message =
         :: fields
   in
   `Assoc (List.rev fields)
+
+let send_message_configuration_to_json
+    (configuration : Types.send_message_configuration) =
+  let fields0 =
+    [
+      ( "acceptedOutputModes",
+        `List
+          (List.map
+             (fun value -> `String value)
+             configuration.accepted_output_modes) );
+      ("returnImmediately", `Bool configuration.return_immediately);
+    ]
+  in
+  let fields1 =
+    match configuration.task_push_notification_config with
+    | Some value ->
+        ( "taskPushNotificationConfig",
+          task_push_notification_config_to_json value )
+        :: fields0
+    | None ->
+        fields0
+  in
+  let fields2 =
+    match configuration.history_length with
+    | Some value ->
+        ("historyLength", `Int value) :: fields1
+    | None ->
+        fields1
+  in
+  `Assoc (List.rev fields2)

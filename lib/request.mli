@@ -1,6 +1,3 @@
-(* FIXME *)
-
-(*
 type send_message_request = {
   tenant : string option;
   message : Types.message;
@@ -8,6 +5,16 @@ type send_message_request = {
   metadata : Types.metadata option;
 }
 
+val build_send_message_request :
+  ?tenant:string ->
+  ?configuration:Types.send_message_configuration ->
+  ?metadata:Types.metadata ->
+  Types.message ->
+  send_message_request
+
+(* FIXME *)
+
+(*
 type get_task_request = {
   tenant : string option;
   id : string;
@@ -68,12 +75,7 @@ type list_tasks_response = Types.list_tasks_response
 type list_task_push_notification_configs_response =
   Types.list_task_push_notification_configs_response
 
-val send_message_request :
-  ?tenant:string ->
-  ?configuration:Types.send_message_configuration ->
-  ?metadata:Types.metadata ->
-  Types.message ->
-  send_message_request
+
 
 val get_task_request :
   ?tenant:string ->
