@@ -8,3 +8,7 @@ single-case = sparse
 field-space=loose
 doc-comments=before
 margin = 80
+let-binding-spacing = compact
+break-collection-expressions = fit-or-vertical
+sequence-style = terminator
+field-space = loose

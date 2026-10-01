@@ -1,3 +1,6 @@
+let protocol_version_header = "A2A-Version"
+let protocol_version_header_value = "1.0"
+
 type id =
   | StringId of string
   | IntId of int
@@ -154,5 +157,11 @@ let send_rpc_message url id params =
     request |> request_to_json |> Yojson.Safe.to_string
     |> Cohttp_lwt.Body.of_string
   in
-  let headers = Cohttp.Header.init_with "Content-Type" "application/json" in
+  let headers =
+    Cohttp.Header.of_list
+      [
+        ("Content-Type", "application/json");
+        (protocol_version_header, protocol_version_header_value);
+      ]
+  in
   Cohttp_lwt_unix.Client.post ~headers ~body (Uri.of_string url)
