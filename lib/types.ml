@@ -45,9 +45,9 @@ type task_state =
   | Completed
   | Failed
   | Canceled
-  | Input_required
+  | InputRequired
   | Rejected
-  | Auth_required
+  | AuthRequired
 
 type task_status = {
   state : task_state;
@@ -141,10 +141,7 @@ type agent_card = {
 }
 
 type string_list = string list
-
-type security_requirement = {
-  schemes : (string * string_list) list;
-}
+type security_requirement = { schemes : (string * string_list) list }
 
 type api_key_security_scheme = {
   description : string option;
@@ -198,9 +195,7 @@ type oauth_flow =
   | Password of password_oauth_flow
   | Device_code of device_code_oauth_flow
 
-type oauth_flows = {
-  flow : oauth_flow;
-}
+type oauth_flows = { flow : oauth_flow }
 
 type oauth2_security_scheme = {
   description : string option;
@@ -213,9 +208,7 @@ type open_id_connect_security_scheme = {
   open_id_connect_url : string;
 }
 
-type mutual_tls_security_scheme = {
-  description : string option;
-}
+type mutual_tls_security_scheme = { description : string option }
 
 type security_scheme =
   | Api_key of api_key_security_scheme

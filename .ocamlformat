@@ -1,0 +1,9 @@
+profile = default
+version = 0.29.0
+
+break-cases = vertical
+type-decl = sparse
+let-and = sparse
+single-case = sparse
+field-space=loose
+doc-comments=before
