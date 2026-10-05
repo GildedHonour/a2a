@@ -27,9 +27,12 @@ let () =
   let params = A2a.Request.build_send_message_request message in
   Lwt_main.run
     ( A2a.Jsonrpc.send_rpc_message url (A2a.Jsonrpc.StringId "1") params
-    >>= fun (response, response_body) ->
-      Cohttp_lwt.Body.to_string response_body >>= fun response_body ->
-      Printf.printf "HTTP status: %s\n"
-        (Cohttp.Code.string_of_status (Cohttp.Response.status response));
-      Printf.printf "Response:\n%s\n" response_body;
-      Lwt.return_unit )
+    >>= fun response ->
+      match response with
+      | A2a.Types.TaskResponse task ->
+          Printf.printf "Task ID: %s\n" task.id;
+          Printf.printf "Context ID: %s\n" task.context_id;
+          Lwt.return_unit
+      | A2a.Types.MessageResponse message ->
+          Printf.printf "Message ID: %s\n" message.message_id;
+          Lwt.return_unit )
