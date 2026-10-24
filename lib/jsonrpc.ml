@@ -32,15 +32,18 @@ let build_rpc_request ?params id method_ =
 
 type rpc_error = {
   code : int;
-  (* FIXME - only for debugging *)
-  (* message : string; *)
-  message2 : string;
+  message : string;
   data : Yojson.Safe.t option;
 }
 
+exception RpcError of rpc_error
+
 let error_to_json (rpc_error : rpc_error) =
   let fields0 =
-    [ ("code", `Int rpc_error.code); ("message", `String rpc_error.message2) ]
+    (* TODO
+        [ ("code", `Int rpc_error.code); ("message", `String rpc_error.message2) ]
+      *)
+    [ ("code", `Int rpc_error.code); ("message", `String rpc_error.message) ]
   in
   let fields1 =
     match rpc_error.data with
@@ -149,25 +152,6 @@ let response_to_json = function
       in
       `Assoc (List.rev fields)
 
-(* let send_rpc_message url id params =
-  let request =
-    build_rpc_request
-      ~params:(send_message_params_to_json params)
-      id SendMessage
-  in
-  let body =
-    request |> request_to_json |> Yojson.Safe.to_string
-    |> Cohttp_lwt.Body.of_string
-  in
-  let headers =
-    Cohttp.Header.of_list
-      [
-        ("Content-Type", "application/json");
-        (protocol_version_header, protocol_version_header_value);
-      ]
-  in
-  Cohttp_lwt_unix.Client.post ~headers ~body (Uri.of_string url) *)
-
 let send_message_response_of_json json =
   let fields =
     match json with
@@ -187,6 +171,35 @@ let send_message_response_of_json json =
   | None, None ->
       raise
         (Json.DecodeError "SendMessage result contains neither task nor message")
+
+let rpc_error_of_json value =
+  let fields =
+    match value with
+    | `Assoc fields ->
+        fields
+    | _ ->
+        raise (Json.DecodeError "JSON-RPC error is not an object")
+  in
+  let code =
+    match List.assoc_opt "code" fields with
+    | Some (`Int value) ->
+        value
+    | Some _ ->
+        raise (Json.DecodeError "JSON-RPC error code is not an integer")
+    | None ->
+        raise (Json.DecodeError "missing JSON-RPC error code")
+  in
+  let message =
+    match List.assoc_opt "message" fields with
+    | Some (`String value) ->
+        value
+    | Some _ ->
+        raise (Json.DecodeError "JSON-RPC error message is not a string")
+    | None ->
+        raise (Json.DecodeError "missing JSON-RPC error message")
+  in
+  let data = List.assoc_opt "data" fields in
+  { code; message; data }
 
 let send_rpc_message url id params =
   let request =
