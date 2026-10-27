@@ -36,6 +36,7 @@ type rpc_error = {
   data : Yojson.Safe.t option;
 }
 
+exception HttpError of int * string
 exception RpcError of rpc_error
 
 let error_to_json (rpc_error : rpc_error) =
@@ -207,46 +208,66 @@ let send_rpc_message url id params =
       ~params:(send_message_params_to_json params)
       id SendMessage
   in
-  let body =
-    request |> request_to_json |> Yojson.Safe.to_string
-    |> Cohttp_lwt.Body.of_string
-  in
+  let body = Yojson.Safe.to_string (request_to_json request) in
   let headers =
     Cohttp.Header.of_list
-      [
-        ("Content-Type", "application/json");
-        (protocol_version_header, protocol_version_header_value);
-      ]
+      [ ("Content-Type", "application/json"); ("A2A-Version", "1.0") ]
   in
-  Cohttp_lwt_unix.Client.post ~headers ~body (Uri.of_string url)
+  Cohttp_lwt_unix.Client.post ~headers
+    ~body:(Cohttp_lwt.Body.of_string body)
+    (Uri.of_string url)
   >>= fun (response, response_body) ->
   Cohttp_lwt.Body.to_string response_body >>= fun response_body ->
-  let json =
+  let status_code =
+    Cohttp.Code.code_of_status (Cohttp.Response.status response)
+  in
+  let value =
     try Yojson.Safe.from_string response_body with
     | Yojson.Json_error message ->
         raise (Json.DecodeError message)
   in
   let fields =
-    match json with
+    match value with
     | `Assoc fields ->
         fields
     | _ ->
         raise (Json.DecodeError "JSON-RPC response is not an object")
   in
+  let version =
+    match List.assoc_opt "jsonrpc" fields with
+    | Some (`String version) ->
+        version
+    | Some _ ->
+        raise (Json.DecodeError "JSON-RPC version is not a string")
+    | None ->
+        raise (Json.DecodeError "missing JSON-RPC version")
+  in
+  if version <> "2.0" then
+    raise (Json.DecodeError "unsupported JSON-RPC version");
+  let expected_id =
+    match id with
+    | StringId value ->
+        `String value
+    | IntId value ->
+        `Int value
+  in
+  (match List.assoc_opt "id" fields with
+  | Some response_id when response_id = expected_id ->
+      ()
+  | Some _ ->
+      raise (Json.DecodeError "JSON-RPC response ID does not match request ID")
+  | None ->
+      raise (Json.DecodeError "missing JSON-RPC response ID"));
   match (List.assoc_opt "result" fields, List.assoc_opt "error" fields) with
   | Some result, None ->
-      (* let response =
-          send_message_response_of_json result
-        in
-        Lwt.return (response, response) *)
+      if status_code < 200 || status_code >= 300 then
+        raise (HttpError (status_code, response_body));
       Lwt.return (send_message_response_of_json result)
+  | None, Some error ->
+      raise (RpcError (rpc_error_of_json error))
   | Some _, Some _ ->
       raise
         (Json.DecodeError "JSON-RPC response contains both result and error")
-  | None, Some error ->
-      raise
-        (Json.DecodeError
-           "JSON-RPC error response decoding is not implemented yet")
   | None, None ->
       raise
         (Json.DecodeError "JSON-RPC response contains neither result nor error")
@@ -254,15 +275,15 @@ let send_rpc_message url id params =
 let task_of_json json =
   let fields =
     match json with
-    | `Assoc fields ->
-        fields
+    | `Assoc x ->
+        x
     | _ ->
         raise (Json.DecodeError "task is not an object")
   in
   let id =
     match List.assoc_opt "id" fields with
-    | Some (`String value) ->
-        value
+    | Some (`String x) ->
+        x
     | Some _ ->
         raise (Json.DecodeError "id is not a string")
     | None ->
@@ -270,8 +291,8 @@ let task_of_json json =
   in
   let context_id =
     match List.assoc_opt "contextId" fields with
-    | Some (`String value) ->
-        value
+    | Some (`String x) ->
+        x
     | Some _ ->
         raise (Json.DecodeError "contextId is not a string")
     | None ->
@@ -286,8 +307,8 @@ let task_of_json json =
   in
   let artifacts =
     match List.assoc_opt "artifacts" fields with
-    | Some (`List values) ->
-        List.map Json.artifact_of_json values
+    | Some (`List x) ->
+        List.map Json.artifact_of_json x
     | Some _ ->
         raise (Json.DecodeError "artifacts is not an array")
     | None ->
@@ -295,8 +316,8 @@ let task_of_json json =
   in
   let history =
     match List.assoc_opt "history" fields with
-    | Some (`List values) ->
-        List.map Json.message_of_json values
+    | Some (`List x) ->
+        List.map Json.message_of_json x
     | Some _ ->
         raise (Json.DecodeError "history is not an array")
     | None ->
